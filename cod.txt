@@ -1,0 +1,738 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace WindowsFormsApp1
+{
+    public partial class Form1 : Form
+    {
+        int step;
+        DataGridView table;
+        DataGridView table_method;
+        int n;
+        List<List<int>> paths;
+        List<int> lengths;
+        public Form1()
+        {
+            step = 0;
+            table = new DataGridView();
+            table_method= new DataGridView();
+            InitializeComponent();
+        }
+        
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            label2.Visible = false;
+            textBox2.Visible = false;
+            
+            
+        }
+        bool check_int(string check, int low_line, int top_line, out int num) {
+            bool ret;
+            if(int.TryParse(check, out num))
+            {
+                if (num >= low_line && num <= top_line)
+                {
+                    ret = true;
+                }
+                else
+                {
+                    ret = false;
+                }
+
+            }
+            else
+            {
+                ret = false;
+            }
+            return ret;
+        }
+        void remove_null_ex(int i, int j)
+        {
+            if (table.Rows[i].Cells[j].Value==null)
+            {
+                table.Rows[i].Cells[j].Value = "";
+            }
+
+        }
+        bool graph_valid(out string list_errors)
+        {
+            bool ret=true;
+            list_errors="Вводимые значения должны лежать в диапазоне от 0 до 100:\r\n";
+            int num;
+            int error_flag1 = 0;
+            
+            for (int i=0; i<n;i++)
+            {
+                for (int j = i+1; j < n; j++)
+                {
+                    remove_null_ex(i, j);
+                        if (!check_int(table.Rows[i].Cells[j].Value.ToString(), 0, 100, out num)) {
+                            list_errors += $"замечена ошибка в дуге {i+1}-{j+1}\r\n";
+                            error_flag1 = 1;
+                        }
+                    
+
+                }
+            }
+            for (int j = 0; j < n; j++)
+            {
+                remove_null_ex(n, j);
+                if (!check_int(table.Rows[n].Cells[j].Value.ToString(), 0, 100, out num))
+                    {
+                        list_errors += $"замечена ошибка времени выполнения в вершине {j+1}\r\n";
+                        error_flag1 = 1;
+                    }
+                
+
+            }
+            if (error_flag1==1)
+            {
+                return false;
+            }
+            
+            List<int> entry = new List<int>();
+            int error_flag2= 0;
+
+            for (int j=1; j<n;j++) { //поиск лишних входов
+                error_flag2 = 1;
+                for (int i=0; i<j;i++)
+                {
+                    
+                    if (table.Rows[i].Cells[j].Value.ToString()!="0")
+                    {
+                        error_flag2 = 0;
+                    }
+                    
+                }
+                if (error_flag2 == 1)
+                {
+                    entry.Add(j);
+                }
+            }
+            List<int> exit = new List<int>();
+            for (int i = 0; i < n-1; i++) //поиск лишних выходов
+            {
+                error_flag2 = 1;
+                for (int j=i+1; j < n; j++)
+                {
+                    
+                    if (table.Rows[i].Cells[j].Value.ToString() != "0")
+                    {
+                        error_flag2 = 0;
+                    }
+
+                }
+                if (error_flag2 == 1)
+                {
+                    exit.Add(i);
+                }
+            }
+            if (entry.Count != 0 || exit.Count != 0)
+            {
+                list_errors = "Граф должен быть гамачным:\r\n";
+                ret=false;
+            }
+            List<int> union = new List<int>();
+            if (exit.Contains(0))
+            {
+                list_errors += "изолирована главная входная вершина\r\n";
+                union.Add(0);
+            }
+            if (entry.Contains(n-1))
+            {
+                list_errors += "изолирована главная выходная вершина\r\n";
+                union.Add(n-1);
+            }
+
+            foreach (var entry_top in entry)
+            {
+                foreach (var exit_top in exit )
+                {
+
+                    if (entry_top==exit_top)
+                    {
+                        list_errors += $"изолирована вершина {exit_top+1}\r\n";
+                        union.Add(exit_top);
+                    }
+                   
+
+                }
+            }
+            foreach (var entry_top in entry)
+            {
+                if (!union.Contains(entry_top))
+                {
+                    list_errors +=  $"найден побочный вход {entry_top+1}\r\n";
+                }
+
+            }
+            foreach (var exit_top in exit)
+            {
+                if (!union.Contains(exit_top))
+                {
+                    list_errors += $"найден побочный выход {exit_top+1}\r\n";
+                }
+
+            }
+
+
+            return ret;
+        }
+        void almost_zero(int save_line, ref int[,] matrix) {
+            for (int i = 1; i < n; i++)//от первой вершины сохраняем пути
+            {
+                if (i > save_line)
+                {
+                    for (int j = 0; j < n; j++)
+                    {
+                        matrix[i, j] = 0;
+                    }
+                }
+            }
+
+        }
+        int number_of_max_len(List<int> lengths)
+        {
+            int max = 0;
+            int num = 0;
+            int i = 0;
+            foreach (var len in lengths)
+            {
+                if (len>max) {
+                    max = len;
+                    num = i;
+                }
+                i++;
+            }
+            return num;
+
+        }
+        int max(List<int> lengths)
+        {
+            int max = 0;
+       
+            foreach (var value in lengths)
+            {
+                if (value > max)
+                {
+                    max = value;
+                    
+                }
+             
+            }
+            return max;
+
+        }
+        void sub(ref List<int> len, List<int> change)
+        {
+            for (int i=0; i<len.Count; i++)
+            {
+                len[i]-= change[i];
+            }
+
+        }
+        bool find_arc(List<int> path, int first, int second)
+        {
+            bool result = false;
+
+            for (int i=0; i<path.Count-1;i++)
+            {
+                if (path[i]==first+1&&path[i+1]==second+1)
+                {
+                    result = true;
+                    break;
+                }
+            }
+
+            return result;
+        }
+        void ban_null(ref int[,] matrix, int first, int second)
+        {
+            for (int column_row = 0; column_row < n; column_row++) //запрещаем к обнулению соседние дуги
+            {  //запрещаем к обнулению элементы в строке
+                if (column_row != second)
+                {
+                        matrix[first, column_row] = 2; //запрет к обнулению
+                }
+                //запрещаем к обнулению элементы в столбце
+                if (column_row != first)
+                {
+                        matrix[column_row, second] = 2; //запрет к обнулению
+                }
+            }
+        }
+        void fill_change(ref List<int> change, int exit, int first, int second)
+        {
+            if (exit == 1)
+            {
+                for (int sign = 0; sign < paths.Count; sign++)
+                {
+                    if (find_arc(paths[sign], first, second))
+                    {
+                        change[sign] = int.Parse(table.Rows[first].Cells[second].Value.ToString());
+                    }
+
+                }
+            }
+        }
+        List<int> list_change(int num_crit, ref int[,] matrix, out int first_top, out int second_top) {
+            List<int> change = new List<int>();
+            for(int index=0;index<paths.Count; index++)
+            {
+                change.Add(0);
+            }
+            List<int> crit = paths[num_crit];
+            int i = 0;
+            first_top=0;
+            second_top=0;
+            int exit = 0;
+            while (i < crit.Count - 1 && exit == 0)//ищем первую дугу в пути, которую можно обнулить
+            {
+                first_top = crit[i]-1;
+                second_top = crit[i+1]-1;
+                if (matrix[first_top,second_top]==1) {
+                    matrix[first_top, second_top] = 0;//обнуляем дугу
+                    ban_null(ref matrix, first_top, second_top);//запрещаем к обнулению соседние
+                    exit = 1;
+                }
+                i++;
+            }
+            if (exit==0)
+            {
+                first_top = -99;
+                second_top = -99;
+            }
+            fill_change(ref change, exit, first_top, second_top);
+            return change;
+        
+        
+        }
+
+        List<int> list_change_2(ref int[,] matrix, out int first_top, out int second_top)
+        {
+            List<int> change = new List<int>();
+            for (int index = 0; index < paths.Count; index++)
+            {
+                change.Add(0);
+            }
+            int i = 0;
+            int j;
+            first_top = 0;
+            second_top = 0;
+            int exit = 0;
+            int exit2;
+            while (i < n&&exit == 0)
+            {
+                exit2 = 0;
+                j = 0;
+                while (j<n&&exit==0&&exit2==0) {
+                    if (matrix[i, 0] == 2) { exit2 = 1; }//если дуга уже обнулена, уходим
+                    else
+                    {
+                        if (matrix[i, j] == 1) {
+                            matrix[i, j] = 0;//обнуляем дугу
+                            first_top = i;
+                            second_top = j;
+                            ban_null(ref matrix, first_top, second_top);//запрещаем к обнулению соседние
+                            exit = 1;
+
+                            
+                        }
+                        j++;
+                    }
+                }
+                i++;
+            }
+            if (exit == 0)
+            {
+                first_top = -99;
+                second_top = -99;
+            }
+            fill_change(ref change, exit, first_top, second_top);
+            return change;
+
+        }
+        string convert_path(List<int> path) {
+            string convert = "";
+            foreach (var top in path) {
+                convert += $"{top}-";
+            }
+            convert=convert.Remove(convert.Length-1);
+            return convert;
+        }
+      
+        private void button1_Click(object sender, EventArgs e)
+        {
+            
+            switch (step) {
+                case 0:
+                    
+                    label2.Visible = false;
+
+                    if (check_int(textBox1.Text, 2, 28, out n)) {
+                        for (int i = 0; i < n; i++)//добавление колонок
+                        {
+                            label1.Text = "Заполните матрицу смежности значением времени дуг, а также введите время каждой команды:";
+                            textBox1.Visible = false;
+                            button1.Text = "рассчитать пути";
+                            table.Columns.Add($"col{i + 1}", $"{i + 1}");
+                            table.Columns[i].Width = 25;
+
+                        }
+
+                        table.Rows.Add(n);//добавление строк
+                        for (int i = 0; i < n; i++)//редактирование строк смежности
+                        {
+
+
+                            table.Rows[i].Height = 15;
+                            table.Rows[i].HeaderCell.Value = $"{i + 1}";
+                            for (int j = 0; j < n; j++)
+                            {
+                                table.Rows[i].Cells[j].Value = "0";
+                                //table.Rows[i].Cells[j].Style.BackColor = Color.Red;
+
+                            }
+
+                        }
+                        for (int i=0; i<n;i++)
+                        {
+                            for (int j = 0; j < n; j++)
+                            {
+                            if (i>=j)
+                            {
+                                    table.Rows[i].Cells[j].ReadOnly = true;
+                                    table.Rows[i].Cells[j].Style.BackColor = Color.Pink;
+                            }
+                            }
+                        }
+                        table.Rows.Add();//добавление строки времени вершин
+                        table.Rows[n].HeaderCell.Style.BackColor = System.Drawing.Color.Red;
+                        table.Rows[n].Height = 16;
+                        table.Rows[n].HeaderCell.Value = "t";
+
+                        table.Name = "matrix";
+                        table.AutoSize = true;
+                        table.ColumnHeadersHeight = 25;
+
+
+                        this.Controls.Add(table);//вывод таблицы
+                        table.Top = 70;
+                        step++;
+                    } else {
+                        label2.Visible = true;
+                        label2.Text = "неверный формат данных (целое число от 2 до 28)";
+                    }
+                   
+                  
+              
+
+
+                    break;
+                case 1:
+                    label2.Visible = false;
+                    textBox2.Visible = false;
+                    string list_error;
+                    int exit = 0;
+                    if (graph_valid(out list_error))
+                    {
+                        button1.Text = "произвести обнуление";
+                        label2.Visible = true;
+
+                        step++;
+                        table.ReadOnly = true;
+                        List<int> tops = new List<int>();
+                        List<string> paths_string = new List<string>();
+                        paths = new List<List<int>>();
+                        List<int> path = new List<int>();
+                        lengths = new List<int>();
+                        path.Add(1);
+
+
+                        for (int j = 0; j < n; j++)
+                        {
+
+                            tops.Add(int.Parse(table.Rows[n].Cells[j].Value.ToString()));
+                        }
+                        lengths.Add(tops[0]);
+                        label1.Text = "";
+                        paths.Add(path);
+                      
+                        while (exit == 0)
+                        {
+
+                            int count_paths = paths.Count();
+                            for (int i = 0; i < count_paths; i++)
+                            {
+                                List<int> next_tops = new List<int>();
+                                List<int> path_before = new List<int>(paths[i]);
+                                int length_before = lengths[i];
+                                int row = paths[i][paths[i].Count - 1] - 1;//вершина - строка таблицы смежности
+                                for (int column = 0; column < n; column++)
+                                { //проходимся по всей строке таблице смежности  
+                                    if (int.Parse(table.Rows[row].Cells[column].Value.ToString()) != 0)//если существует дуга
+                                    {
+                                        next_tops.Add(column + 1);
+                                    }
+                                }
+                                if (next_tops.Count != 0)
+                                {
+                                    paths[i].Add(next_tops[0]);
+                                    lengths[i] += int.Parse(table.Rows[row].Cells[next_tops[0] - 1].Value.ToString()) + tops[next_tops[0] - 1];
+
+
+                                }
+                                if (next_tops.Count > 0)
+                                {
+                                    for (int top = 1; top < next_tops.Count; top++)
+                                    {
+                                        int len = length_before;
+                                        List<int> new_path = new List<int>(path_before);
+                                        new_path.Add(next_tops[top]);
+                                        len += int.Parse(table.Rows[row].Cells[next_tops[top] - 1].Value.ToString()) + tops[next_tops[top] - 1];
+                                        paths.Add(new_path);
+                                        lengths.Add(len);
+                                    }
+                                }
+                                exit = 1;
+                                foreach (var each_path in paths)
+                                {
+                                    if (each_path[each_path.Count - 1] != n)
+                                    {
+                                        exit = 0;
+                                        break;
+
+                                    }
+
+                                }
+
+                            }
+                        }
+                        table.Visible = false;
+                        label2.Text = "Все пути и их длины:\r\n";
+                        label2.Left = 10;
+                        label2.Top = 80;
+                        int num_path = 0;
+                        foreach (var element in paths)
+                        {
+
+                            label2.Text += $"{convert_path(element)} имеет длину - {lengths[num_path]}\r\n";
+                            num_path++;
+
+                        }
+
+                    
+                    }
+                    else
+                    {
+                        
+                        textBox2.Left = table.Right + 5;
+                        textBox2.Top = table.Top;
+                        textBox2.Height = table.Height;
+                        textBox2.Visible = true;
+                        textBox2.Text = list_error;
+
+
+                
+                    }
+
+                    break;
+                case 2:
+                    step++;
+                    button1.Text = "закончить";
+                    label2.Visible = false;
+                    exit = 0;
+                    int count_path = paths.Count();
+                    int[,] matrix = new int[n, n];
+
+                    for (int i = 0; i < n; i++) // fill matrix by values
+                    {
+                        for (int j = 0; j < n; j++)
+                        {
+                            if (int.Parse(table.Rows[i].Cells[j].Value.ToString()) != 0){//если существует дуга
+                                matrix[i, j] = 1;
+                            }
+                            else {
+                                matrix[i, j] = -1;
+                            }
+                           
+                        }
+                    }
+                    int first, second;
+                    List<int> change = list_change(number_of_max_len(lengths), ref matrix, out first, out second);
+
+                    table_method.Columns.Add( "0", $"1(-{max(change)})");
+                    table_method.AutoSize = true;
+                    table_method.ReadOnly = true;
+                    table_method.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells;
+                    
+                    table_method.Rows.Add(count_path+1);//добавление строк
+                    List<int> change2;
+                    for (int i = 0; i <count_path; i++)//редактирование строк 
+                    {
+
+                        
+                            table_method.Rows[i].Height = 15;
+                            table_method.Rows[i].HeaderCell.Value = $"{convert_path(paths[i])}";
+
+
+                            table_method.Rows[i].Cells[0].Value = lengths[i].ToString();
+                            if (i == number_of_max_len(lengths))
+                            {
+                                table_method.Rows[i].Cells[0].Style.BackColor = Color.Red;
+                            }
+                            else
+                            {
+                                if (change[i] != 0)
+                                {
+                                    table_method.Rows[i].Cells[0].Style.BackColor = Color.Pink;
+                                }
+                            }
+                       
+
+                    }
+
+                    table_method.Rows[count_path].Height = 16;
+                    table_method.Rows[count_path].HeaderCell.Value = "дуга";
+                    table_method.Rows[count_path].Cells[0].Value =$"{first+1}-{second+1}" ;
+                    sub(ref lengths, change);
+                    int num_of_col = 1;
+                    int entry2 = 0;
+                    //первая часть
+                    while (exit == 0) {
+                        change = list_change(number_of_max_len(lengths), ref matrix, out first, out second);
+                        table_method.Columns.Add($"{num_of_col}", $"{num_of_col+1}(-{max(change)})");
+                        for (int i = 0; i < count_path; i++)
+                        {
+                            table_method.Rows[i].Cells[num_of_col].Value = lengths[i].ToString();
+                            if (i == number_of_max_len(lengths))
+                            {
+                                table_method.Rows[i].Cells[num_of_col].Style.BackColor = Color.Red;
+                            }
+                            else
+                            {
+                                if (change[i] != 0)
+                                {
+                                    table_method.Rows[i].Cells[num_of_col].Style.BackColor = Color.Pink;
+                                }
+                            }
+                        }
+                        if (first != -99)
+                        {
+                            table_method.Rows[count_path].Cells[num_of_col].Value = $"{first + 1}-{second + 1}";
+                            sub(ref lengths, change);
+
+                        }
+                        else//подводка ко второй части
+                        {
+                            change2 = list_change_2(ref matrix, out first, out second); 
+                            table_method.Columns[num_of_col].HeaderText=$"{num_of_col + 1}(-{max(change2)})";
+                            table_method.Rows[count_path].Cells[num_of_col].Value = $"{first + 1}-{second + 1}";
+                            for (int i = 0; i < count_path; i++)
+                            {
+                                table_method.Rows[i].Cells[num_of_col].Value = lengths[i].ToString();
+                                    if (change2[i] != 0)
+                                    {
+                                        table_method.Rows[i].Cells[num_of_col].Style.BackColor = Color.Aquamarine;
+                                    }
+                                
+                            }
+                            if (first != -99)
+                            {
+                                table_method.Rows[count_path].Cells[num_of_col].Value = $"{first + 1}-{second + 1}";
+                                sub(ref lengths, change2);
+
+                            }
+                            else
+                            {
+                                table_method.Rows[count_path].Cells[num_of_col].Value = "";
+                                entry2 = 1;
+                            }
+                           
+                        }
+                        
+
+                        num_of_col++;
+                        exit = 1;
+                        foreach (var elem in change)
+                        {
+
+                            if (elem != 0)
+                            {
+                                exit = 0;
+                                break;
+                            }
+                        }
+                        
+                        
+                    
+                    }
+
+
+                    //вторая часть
+                    exit = 0;
+                    while (exit == 0 && entry2 ==0)
+                    {
+                        change2 = list_change_2(ref matrix, out first, out second);
+                       
+                        table_method.Columns.Add($"{num_of_col}", $"{num_of_col + 1}(-{max(change2)})");
+                        table_method.Rows[count_path].Cells[num_of_col].Value = $"{first + 1}-{second + 1}";
+                        for (int i = 0; i < count_path; i++)
+                        {
+                            table_method.Rows[i].Cells[num_of_col].Value = lengths[i].ToString();
+                            if (change2[i] != 0)
+                            {
+                                table_method.Rows[i].Cells[num_of_col].Style.BackColor = Color.Aquamarine;
+                            }
+
+                        }
+                        if (first != -99)
+                        {
+                            table_method.Rows[count_path].Cells[num_of_col].Value = $"{first + 1}-{second + 1}";
+                            sub(ref lengths, change2);
+
+                        }
+                        else
+                        {
+                            table_method.Rows[count_path].Cells[num_of_col].Value = "";
+                            exit = 1;
+                        }
+                     
+                        num_of_col++;
+                    }
+                    this.Controls.Add(table_method);//вывод таблицы
+                    table_method.Top = 70;
+
+
+
+
+
+
+
+
+
+
+
+
+                    break;
+                default:
+                    this.Close();
+                    break;
+
+
+            }
+            
+
+
+        }
+
+    
+    }
+}
